@@ -1,0 +1,169 @@
+*&---------------------------------------------------------------------*
+*& Report z03_classical_reports
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT z03_classical_reports LINE-COUNT 12(2).
+
+TYPES: BEGIN OF ls_flight,
+         pm   TYPE s_curr,
+         desc TYPE desc40,
+       END OF ls_flight.
+
+DATA: lv_date TYPE s_date,
+      lv_curr TYPE s_currcode,
+      gt_flight TYPE TABLE OF ls_flight,
+      wpa_flight TYPE ls_flight,
+      lt_links TYPE TABLE OF TLINE.
+
+PARAMETERS: p_carrid TYPE s_carr_id.
+SELECT-OPTIONS: s_fldate FOR lv_date NO-EXTENSION.
+SELECT-OPTIONS: s_curr FOR lv_curr NO INTERVALS MODIF ID cur.
+PARAMETERS: p_chk1 TYPE c AS CHECKBOX USER-COMMAND select.
+
+INITIALIZATION.
+  s_fldate-sign = 'I'.
+  s_fldate-option = 'BT'.
+  s_fldate-low = '20190124'.
+  s_fldate-high = sy-datum.
+  APPEND s_fldate.
+
+AT SELECTION-SCREEN ON HELP-REQUEST FOR p_chk1.
+  CALL FUNCTION 'HELP_OBJECT_SHOW'
+    EXPORTING
+      dokclass                            = 'TX'
+*     DOKLANGU                            = SY-LANGU
+      dokname                             = 'ZDOCCUR'
+*     DOKTITLE                            = ' '
+*     CALLED_BY_PROGRAM                   = ' '
+*     CALLED_BY_DYNP                      = ' '
+*     CALLED_FOR_TAB                      = ' '
+*     CALLED_FOR_FIELD                    = ' '
+*     CALLED_FOR_TAB_FLD_BTCH_INPUT       = ' '
+*     MSG_VAR_1                           = ' '
+*     MSG_VAR_2                           = ' '
+*     MSG_VAR_3                           = ' '
+*     MSG_VAR_4                           = ' '
+*     CALLED_BY_CUAPROG                   = ' '
+*     CALLED_BY_CUASTAT                   =
+*     SHORT_TEXT                          = ' '
+*     CLASSIC_SAPSCRIPT                   = ' '
+*     MES_PROGRAM_NAME                    = ' '
+*     MES_INCLUDE_NAME                    = ' '
+*     MES_LINE_NUMBER                     =
+*     MES_EXCEPTION                       = ' '
+   TABLES
+     LINKS                               = lt_links
+   EXCEPTIONS
+     OBJECT_NOT_FOUND                    = 1
+     SAPSCRIPT_ERROR                     = 2
+     OTHERS                              = 3
+            .
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR s_curr-low.
+
+gt_flight = VALUE #( ( pm = 'USD' desc = text-009 )
+                     ( pm = 'EUR' desc = text-010 )
+                     ( pm = 'JPY' desc = text-011 ) ).
+CLEAR: wpa_flight.
+
+
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+*     DDIC_STRUCTURE         = ' '
+      retfield               = ' pm '
+*     PVALKEY                = ' '
+     DYNPPROG               =  sy-repid
+     DYNPNR                 =  sy-dynnr
+     DYNPROFIELD            = ' s_curr '
+*     STEPL                  = 0
+*     WINDOW_TITLE           =
+*     VALUE                  = ' '
+     VALUE_ORG              = 'S'
+*     MULTIPLE_CHOICE        = ' '
+*     DISPLAY                = ' '
+*     CALLBACK_PROGRAM       = ' '
+*     CALLBACK_FORM          = ' '
+*     CALLBACK_METHOD        =
+*     MARK_TAB               =
+*   IMPORTING
+*     USER_RESET             =
+    tables
+      value_tab              = gt_flight
+*     FIELD_TAB              =
+*     RETURN_TAB             =
+*     DYNPFLD_MAPPING        =
+   EXCEPTIONS
+     PARAMETER_ERROR        = 1
+     NO_VALUES_FOUND        = 2
+     OTHERS                 = 3
+    .
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+
+AT SELECTION-SCREEN OUTPUT.
+  IF p_chk1 = ' '.
+    LOOP AT SCREEN.
+      IF screen-group1 = 'CUR'.
+        screen-active = 0.
+        MODIFY SCREEN.
+      ENDIF.
+    ENDLOOP.
+  ENDIF.
+
+  IF p_chk1 = 'X'.
+    LOOP AT SCREEN.
+      IF screen-group1 = 'CUR'.
+        screen-active = 1.
+        MODIFY SCREEN.
+      ENDIF.
+    ENDLOOP.
+  ENDIF.
+
+AT SELECTION-SCREEN.
+  IF s_curr-low IS NOT INITIAL.
+    IF s_curr-low <> 'EUR' AND s_curr-low <> 'USD' AND s_curr-low <> 'JPY'.
+      MESSAGE e002(Z03_Message).
+    ENDIF.
+  ENDIF.
+
+AT SELECTION-SCREEN ON s_curr.
+  IF s_curr-low IS NOT INITIAL.
+    IF s_curr-low <> 'EUR' AND s_curr-low <> 'USD' AND s_curr-low <> 'JPY'.
+      MESSAGE e000(Z03_Message).
+    ENDIF.
+  ENDIF.
+
+START-OF-SELECTION.
+  SELECT carrid, connid, fldate, price, Currency, planetype
+    FROM sflight INTO TABLE @DATA(lt_flight)
+    WHERE carrid = @p_carrid
+    AND fldate IN @s_fldate
+    AND currency IN @s_curr.
+
+  LOOP AT lt_flight INTO DATA(wa_flight).
+    WRITE:/ wa_flight-carrid UNDER TEXT-002 ,
+            wa_flight-connid UNDER TEXT-003 ,
+            wa_flight-fldate  UNDER TEXT-004 ,
+            wa_flight-price CENTERED UNDER TEXT-005,
+            wa_flight-currency CENTERED UNDER TEXT-006,
+            wa_flight-planetype UNDER TEXT-007.
+  ENDLOOP.
+
+END-OF-SELECTION.
+  WRITE: / 'This is end of selection.'.
+  WRITE: / TEXT-000.
+
+TOP-OF-PAGE.
+
+  WRITE:/ TEXT-001, sy-pagno.
+  WRITE:/.
+  WRITE:/ TEXT-002, 13 TEXT-003 , 28 TEXT-004 , 48 TEXT-005 , 70 TEXT-006, 80 TEXT-007.
+
+END-OF-PAGE.
+  WRITE:/ TEXT-008, sy-pagno.
